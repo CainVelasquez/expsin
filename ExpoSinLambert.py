@@ -1,7 +1,6 @@
 import math
 from ClassExpoSin import *
 from ExpoSin import *
-from Search import *
 
 class ExpoSinLambert(object):
     """
@@ -31,13 +30,44 @@ class ExpoSinLambert(object):
         # We know that TOF is monotonic in tany1:
         min_tof_exposin = self.classExpoSin.createExpoSin(tany1Range[0])
         max_tof_exposin = self.classExpoSin.createExpoSin(tany1Range[1])
-        if tof < min_tof_exposin.dT(self.psi, mu) or tof > max_tof_exposin.dT(self.psi, mu):
-            raise Exception('Time of flight not achievable with given parameters')
+        min_tof = min_tof_exposin.dT(self.psi, mu)
+        max_tof = max_tof_exposin.dT(self.psi, mu)
+        if tof < min_tof or tof > max_tof:
+            raise Exception('Time of flight not achievable with given parameters, %f < tof < %f' % (min_tof,max_tof))
         self.solexposin = searchDT(self.classExpoSin, self.tof, self.mu)
 
     def maxAccel(self):
         pass
 
     def boundaryV(self):
-        
-        pass
+        # at start:
+        t = self.solexposin.thetadot(0.0, self.mu) * self.solexposin.r(0.0)
+        r = self.solexposin.rdot(0.0)
+        v1 = math.sqrt(t**2 + r**2)
+        # at end:
+        t = self.solexposin.thetadot(self.psi, self.mu) * self.solexposin.r(self.psi)
+        r = self.solexposin.rdot(self.psi)
+        v2 = math.sqrt(t**2 + r**2)
+
+        return v1, v2
+
+def searchDT(expsinclass, dT, mu):
+    range_ = expsinclass.tany1Range()
+    a = range_[0]
+    b = range_[1]
+    tof_a = expsinclass.createExpoSin(a).dT(expsinclass.psi, mu)
+    tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
+    c = b - (tof_b - dT) * (b - a) / (tof_b - tof_a)
+    tof_c = expsinclass.createExpoSin(c).dT(expsinclass.psi, mu)
+
+    while math.fabs(tof_c - dT) > 1.0e-6:
+        if tof_a * tof_c > 0: #same sign
+            a = c
+        elif tof_b * tof_c > 0: #same sign
+            b = c
+        tof_a = expsinclass.createExpoSin(a).dT(expsinclass.psi, mu)
+        tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
+        c = b - (tof_b - dT) * (b - a) / (tof_b - tof_a)
+        tof_c = expsinclass.createExpoSin(c).dT(expsinclass.psi, mu)
+
+    return expsinclass.createExpoSin(c)

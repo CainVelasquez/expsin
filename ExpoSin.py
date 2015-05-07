@@ -19,6 +19,9 @@ class ExpoSin(object):
     def r(self, theta):
         return self.k0 * math.exp(self.k1 * math.sin(self.k2 * theta + self.phi))
 
+    def rdot(self, theta):
+        return self.k0 * math.exp(self.k1 * math.sin(self.k2 * theta + self.phi)) * self.k1 * math.cos(self.k2 * theta + self.phi) * self.k2
+
     def thetadot(self, theta, mu):
         return math.sqrt(mu / self.r(theta)**3 / (self.tany(theta)**2
         + self.k1 * self.k2**2 * math.sin(self.k2 * theta + self.phi) + 1))
