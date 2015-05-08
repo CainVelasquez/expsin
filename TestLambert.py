@@ -17,8 +17,11 @@ N = 1
 lw = False
 
 # k2 - the free variable that describes how quickly the radius cycles with time.
-# the solver in its current form is rather finnicky about your choice of k2 -
+# the solver in its current form is rather finnicky about your choice of k2;
 # you will want to explore potentially many values (many will result in errors).
+# It can be shown that all possible k2 values are within the range
+#       k2^4 = (4 / ln^2(r1/r2))
+# from (11) in Izzo's paper.
 k2 = 0.75
 
 # Solution of the ExpoSin Lambert problem
