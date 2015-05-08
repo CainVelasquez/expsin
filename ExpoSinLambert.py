@@ -1,13 +1,20 @@
 import math
-from ClassExpoSin import *
-from ExpoSin import *
+from ClassExpoSin import ClassExpoSin
+from ExpoSin import graphExpoSins
+from PyKEP import DAY2SEC
 
 class ExpoSinLambert(object):
+
     """
-    Provides a full description of a trajectory based on an exponential sinusoid
-    using the parameterization of a Lambert problem.
+    Lambert solver for exponential sinusoid trajectories.
+
+    Currently only solves the reduced 2-dimensional case.
+    Currently only outputs a single solving trajectory, when in theory there
+    are potentially 2N + 1 solving trajectories.
     """
-    def __init__(self, r1, r2, tof, mu, N=0, lw=False, k2=0.125):
+
+    def __init__(self, r1, r2, tof, mu, N=0, lw=False, k2=0.3):
+        """Currently solves entire thing within init..."""
         r1mag = math.sqrt(sum([x*x for x in r1]))
         r2mag = math.sqrt(sum([x*x for x in r2]))
         angle = math.acos(sum([x*y for x,y in zip(r1,r2)])/r1mag/r2mag)
@@ -28,30 +35,33 @@ class ExpoSinLambert(object):
         if tany1Range is None:
             raise Exception('No feasible ExpoSins for given parameters')
         # We know that TOF is monotonic in tany1:
-        min_tof_exposin = self.classExpoSin.createExpoSin(tany1Range[0])
-        max_tof_exposin = self.classExpoSin.createExpoSin(tany1Range[1])
-        min_tof = min_tof_exposin.dT(self.psi, mu)
-        max_tof = max_tof_exposin.dT(self.psi, mu)
-        if tof < min_tof or tof > max_tof:
-            raise Exception('Time of flight not achievable with given parameters, %f < tof < %f' % (min_tof,max_tof))
-        self.solexposin = searchDT(self.classExpoSin, self.tof, self.mu)
+        esa = self.classExpoSin.createExpoSin(tany1Range[0]).dT(self.psi, mu)
+        esb = self.classExpoSin.createExpoSin(tany1Range[1]).dT(self.psi, mu)
+        min_tof = min(esa, esb)
+        max_tof = max(esa, esb)
+        if tof < min_tof:
+            raise Exception('Time of flight too short for given parameters, min %i < tof %i < max %i (days)' % (min_tof / DAY2SEC, tof / DAY2SEC, max_tof / DAY2SEC))
+        if tof > max_tof:
+            raise Exception('Time of flight too long for given parameters, min %i < tof %i < max %i (days)' % (min_tof / DAY2SEC, tof / DAY2SEC, max_tof / DAY2SEC))
+        self.fittedExpoSin = searchDT(self.classExpoSin, self.tof, self.mu)
 
     def maxAccel(self):
+        """Get thrust ceiling to follow the trajectory."""
+        pass
+
+    def totalAccel(self):
+        """Calculate total impulse required along the arc."""
         pass
 
     def boundaryV(self):
-        # at start:
-        t = self.solexposin.thetadot(0.0, self.mu) * self.solexposin.r(0.0)
-        r = self.solexposin.rdot(0.0)
-        v1 = math.sqrt(t**2 + r**2)
-        # at end:
-        t = self.solexposin.thetadot(self.psi, self.mu) * self.solexposin.r(self.psi)
-        r = self.solexposin.rdot(self.psi)
-        v2 = math.sqrt(t**2 + r**2)
+        """Calculate the initial boundary velocities."""
+        return self.fittedExpoSin.vmag(0.0, self.mu), self.fittedExpoSin.vmag(self.psi, self.mu)
 
-        return v1, v2
+    def graph(self):
+        graphExpoSins([self.fittedExpoSin], self.classExpoSin.psi)
 
 def searchDT(expsinclass, dT, mu):
+    """Search for a given dT using Regula Falsi method."""
     range_ = expsinclass.tany1Range()
     a = range_[0]
     b = range_[1]
@@ -60,14 +70,20 @@ def searchDT(expsinclass, dT, mu):
     c = b - (tof_b - dT) * (b - a) / (tof_b - tof_a)
     tof_c = expsinclass.createExpoSin(c).dT(expsinclass.psi, mu)
 
-    while math.fabs(tof_c - dT) > 1.0e-6:
-        if tof_a * tof_c > 0: #same sign
+    overflow = 5000
+
+    while math.fabs(tof_c - dT) > 1.0e-6 and overflow >= 0:
+        if (tof_a > 0 and tof_c > 0) or (tof_a < 0 and tof_c < 0): # same sign?
             a = c
-        elif tof_b * tof_c > 0: #same sign
+        elif (tof_b > 0 and tof_c > 0) or (tof_b < 0 and tof_c < 0): # same sign?
             b = c
         tof_a = expsinclass.createExpoSin(a).dT(expsinclass.psi, mu)
         tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
         c = b - (tof_b - dT) * (b - a) / (tof_b - tof_a)
         tof_c = expsinclass.createExpoSin(c).dT(expsinclass.psi, mu)
+        overflow -= 1
+
+    if overflow < 0:
+        raise Exception('Failed to find required dT.')
 
     return expsinclass.createExpoSin(c)
