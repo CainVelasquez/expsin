@@ -1,25 +1,32 @@
 import math
 from ClassExpoSin import ClassExpoSin
-from ExpoSin import graph2DExpoSins, graph3DExpoSin
+from ExpoSin import graph2DExpoSin, graph3DExpoSin
 from PyKEP import DAY2SEC
 from Vector import *
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.axes3d import Axes3D
 
 class ExpoSinLambert(object):
 
     """
     Lambert solver for exponential sinusoid trajectories.
 
-    Currently only solves the reduced 2-dimensional case.
     Currently only outputs a single solving trajectory, when in theory there
     are potentially 2N + 1 solving trajectories.
     """
 
     def __init__(self, r1, r2, tof, mu, N=0, lw=False, k2=0.3):
-        """Currently solves entire thing within init..."""
-        r1mag = math.sqrt(sum([x*x for x in r1]))
-        r2mag = math.sqrt(sum([x*x for x in r2]))
+        """
+        Set up the problem with the given Lambert problem parameterization.
+        r1 := starting position (array3)
+        r2 := ending position (array3)
+        tof := time in seconds for the transfer
+        mu := gravitational parameter
+        N := number of revolutions to force before intercept
+        lw := traverse long way instead of shortest angle
+        k2 := free winding parameter of exponential sinusoid, choose carefully!
+        """
+        # Currently solves the entire thing in init...
+        r1mag = mag(r1)
+        r2mag = mag(r2)
         angle = math.acos(sum([x*y for x,y in zip(r1,r2)])/r1mag/r2mag)
         if lw:
             angle = math.pi * 2 - angle
@@ -36,7 +43,7 @@ class ExpoSinLambert(object):
         self.classExpoSin = ClassExpoSin(k2, r1mag, r2mag, angle, N)
         tany1Range = self.classExpoSin.tany1Range()
         if tany1Range is None:
-            raise Exception('No feasible ExpoSins for given parameters')
+            raise Exception('No feasible exponential sinusoid trajectories for given problem!')
         # We know that TOF is monotonic in tany1:
         esa = self.classExpoSin.createExpoSin(tany1Range[0]).dT(self.psi, mu)
         esb = self.classExpoSin.createExpoSin(tany1Range[1]).dT(self.psi, mu)
@@ -54,11 +61,12 @@ class ExpoSinLambert(object):
 
     def impulses(self):
         """Calculate total impulse and maximum acceleration required along the arc."""
-        dt = self.tof / 100
+        ABSCISSAS = 100
+        dt = self.tof / ABSCISSAS
         theta = 0.0
         impulse = 0.0
         maxA = 0.0
-        for i in range(100):
+        for i in range(ABSCISSAS):
             requiredA = math.fabs(self.fittedExpoSin.requiredA(theta, self.mu))
             if requiredA > maxA:
                 maxA = requiredA
@@ -80,14 +88,8 @@ class ExpoSinLambert(object):
 
         normal = cross(self.r1, self.r2)
 
-        dir1_t = unit(cross(normal, self.r1))
-        dir1_r = unit(self.r1)
-
-        dir2_t = unit(cross(normal, self.r2))
-        dir2_r = unit(self.r2)
-
-        v1 = add(scale(dir1_t, v1_t), scale(dir1_r, v1_r))
-        v2 = add(scale(dir2_t, v2_t), scale(dir2_r, v2_r))
+        v1 = transform(v1_t, v1_r, self.r1, normal)
+        v2 = transform(v2_t, v2_r, self.r2, normal)
 
         if self.lw:
             v1 = scale(v1, -1.0)
@@ -96,22 +98,16 @@ class ExpoSinLambert(object):
         return v1, v2
 
     def graph2DReduced(self, ax):
-        graph2DExpoSins(ax, [self.fittedExpoSin], self.classExpoSin.psi)
+        """Graph the Lambert arc for the 2D reduced case."""
+        graph2DExpoSin(ax, self.fittedExpoSin, self.classExpoSin.psi)
         ax.plot([0.0], [self.r1mag],'ko')
         ax.plot([self.psi], [self.r2mag],'ro')
         ax.grid(True)
         ax.set_title('2D Reduced Problem')
 
     def graph3D(self, ax):
+        """Graph the Lambert arc in the full 3D representation."""
         graph3DExpoSin(ax, self.fittedExpoSin, self.classExpoSin.psi, self.r1, self.r2, self.lw)
-        ax.plot([0], [0], [0], 'yo')
-        ax.plot([self.r1[0]], [self.r1[1]], [self.r1[2]], 'ko')
-        ax.plot([self.r2[0]], [self.r2[1]], [self.r2[2]], 'ro')
-        #v1, v2 = self.boundaryV()
-        #r1p = add(scale(v1, 5000000.0), self.r1)
-        #r2p = add(scale(v2, 5000000.0), self.r2)
-        #ax.plot([self.r1[0], r1p[0]], [self.r1[1], r1p[1]], [self.r1[2], r1p[2]], 'k')
-        #ax.plot([self.r2[0], r2p[0]], [self.r2[1], r2p[1]], [self.r2[2], r2p[2]], 'r')
         ax.set_title('3D Trajectory')
 
 def searchDT(expsinclass, dT, mu):
@@ -122,7 +118,12 @@ def searchDT(expsinclass, dT, mu):
     since the solver is usually dealing in hundreds of days while the current
     criterion looks for several-second precision! If you are getting the exception
     it throws, try this first.
+
+    Returns the solving ExpoSin, its TOF, and its tany1
     """
+    STOP_CRITERION = 1.0 # seconds
+    MAX_ITERS = 10000
+
     range_ = expsinclass.tany1Range()
     a = range_[0]
     b = range_[1]
@@ -130,26 +131,23 @@ def searchDT(expsinclass, dT, mu):
     tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
 
     # we have to limit the maximum TOF to ~1000 years.
-    # there is a significant loss of precision in the rootfinding that causes
+    # there is a significant loss of precision in the= rootfinding that causes
     # it to fail completely if it is not restricted.
-    if tof_b is max(tof_b, tof_a):
-        while tof_b > DAY2SEC * 365 * 1000:
-            b *= 0.90
-            tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
-    else:
-        while tof_a > DAY2SEC * 365 * 1000:
-            a *= 0.90
-            tof_a = expsinclass.createExpoSin(a).dT(expsinclass.psi, mu)
+    MAX_DT = 1000 * 365.0 * DAY2SEC
+    if dT > MAX_DT:
+        raise Exception('Cannot search for dT over %i years, try changing the limit' % (MAX_DT / 365 / DAY2SEC))
+    # Clamp the tany1 range to fit the restriction
+    while tof_b > MAX_DT:
+        b *= 0.95
+        tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
+    while tof_a > MAX_DT:
+        a *= 0.95
+        tof_a = expsinclass.createExpoSin(a).dT(expsinclass.psi, mu)
 
-    # sanity check
-    if min(tof_a, tof_b) > dT or max(tof_a, tof_b) < dT:
-        raise Exception('Time of flight not possible!')
     c = b - (tof_b - dT) * (b - a) / (tof_b - tof_a)
     tof_c = expsinclass.createExpoSin(c).dT(expsinclass.psi, mu)
 
-    overflow = 10000
-
-    while math.fabs(tof_c - dT) > 1.0 * 86400 and overflow >= 0:
+    while math.fabs(tof_c - dT) > STOP_CRITERION and MAX_ITERS >= 0:
         if (tof_a > 0 and tof_c > 0) or (tof_a < 0 and tof_c < 0): # same sign?
             a = c
         elif (tof_b > 0 and tof_c > 0) or (tof_b < 0 and tof_c < 0): # same sign?
@@ -158,9 +156,9 @@ def searchDT(expsinclass, dT, mu):
         tof_b = expsinclass.createExpoSin(b).dT(expsinclass.psi, mu)
         c = b - (tof_b - dT) * (b - a) / (tof_b - tof_a)
         tof_c = expsinclass.createExpoSin(c).dT(expsinclass.psi, mu)
-        overflow -= 1
+        MAX_ITERS -= 1
 
-    if overflow < 0:
-        raise Exception('Failed to find required dT in alotted iterations. %.1f, %.1f, %.1f' % (a, b, c))
+    if MAX_ITERS < 0:
+        raise Exception('Failed to find required dT in allotted iterations.')
 
     return expsinclass.createExpoSin(c), tof_c, c

@@ -1,0 +1,9 @@
+Some transfer problems that had nice output.
+
+start, tof, p1, p2, revs, longway, k2
+=====================================
+0,365*3.5,earth,mars,2,True,0.15
+400,400,earth,mars,0,True,0.75
+0,365*14,earth,jupiter,3,False,0.159
+0,365*26.75,earth,saturn,3,True,0.1
+70,365*2.4,earth,mercury,4,False,0.125

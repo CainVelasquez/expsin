@@ -1,5 +1,4 @@
 import math
-import matplotlib.pyplot as plt
 from Vector import *
 
 class ExpoSin(object):
@@ -14,7 +13,7 @@ class ExpoSin(object):
 
     def __str__(self):
         """Pretty print the parameters for the given exponential sinusoid."""
-        return 'k0 = %f, k1 = %f, k2 = %f, phi = %f' % (self.k0, self.k1, self.k2, self.phi)
+        return 'k0 = %.4f, k1 = %.4f, k2 = %.4f, phi = %.4f' % (self.k0, self.k1, self.k2, self.phi)
 
     def tany(self, theta):
         """Get the flight path angle stored as its tangent."""
@@ -36,8 +35,9 @@ class ExpoSin(object):
     def dT(self, psi, mu):
         """Calculate the time to traverse the given angle."""
         #Performs a placeholder midpoint algorithm to evaluate the quadrature.
-        dtheta = psi / 100
-        thetai = [dtheta * t + dtheta / 2 for t in range(100)]
+        ABSCISSAS = 100
+        dtheta = psi / ABSCISSAS
+        thetai = [dtheta * t + dtheta / 2 for t in range(ABSCISSAS)]
         integrandi = [1.0/self.thetadot(t, mu) * dtheta for t in thetai]
         integral = sum(integrandi)
         return integral
@@ -61,16 +61,18 @@ class ExpoSin(object):
         """Calculate the required acceleration to follow the curve."""
         return mu / self.r(theta)**2 * self.localA(theta)
 
-def graph2DExpoSins(ax, exposins, psi):
-    """Graph an array of exponential sinusoid objects."""
-    thetai = [psi / 400 * t for t in range(401)]
-    for exposin in exposins:
-        radiusi = [exposin.r(t) for t in thetai]
-        ax.plot(thetai, radiusi, 'k')
+def graph2DExpoSin(ax, exposin, psi):
+    """Graph an exponential sinusoid object in its 2D reduced representation."""
+    samples = int(psi * 10.0)
+    thetai = [psi / samples * t for t in range(samples + 1)]
+    radiusi = [exposin.r(t) for t in thetai]
+    ax.plot(thetai, radiusi, 'k')
 
 def graph3DExpoSin(ax, exposin, psi, r1, r2, backward):
+    """Graph an exponential sinusoid object in its 3D form."""
+    samples = int(psi * 10.0)
     normal = cross(r1, r2)
-    thetai = [psi / 400 * t for t in range(401)]
+    thetai = [psi / samples * t for t in range(samples + 1)]
     radiusi = [exposin.r(t) for t in thetai]
     if backward:
         rti = [-r * math.sin(t) for r, t in zip(radiusi, thetai)]
