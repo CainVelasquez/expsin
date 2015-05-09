@@ -3,6 +3,7 @@ from ClassExpoSin import ClassExpoSin
 from ExpoSin import graph2DExpoSin, graph3DExpoSin
 from PyKEP import DAY2SEC
 from Vector import *
+from mpl_toolkits.mplot3d import Axes3D
 
 class ExpoSinLambert(object):
 
