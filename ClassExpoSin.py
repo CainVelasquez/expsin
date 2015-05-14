@@ -45,6 +45,10 @@ class ClassExpoSin(object):
         r2 = self.r2
         psi = self.psi
 
+        mintany1, maxtany1 = self.tany1Range()
+        if tany1 > maxtany1 or tany1 < mintany1:
+            raise Exception('Cannot create ExpoSin with given tany1; out of legal range.')
+
         logr1r2 = math.log(r1 / r2)
         sink2O = math.sin(k2 * psi)
         cosk2O = math.cos(k2 * psi)
