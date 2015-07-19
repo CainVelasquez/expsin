@@ -4,4 +4,6 @@
 *.o
 *.pyc
 *.sh
-.*
+.idea/
+.ipynb_checkpoints/
+.gitignore
