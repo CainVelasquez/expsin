@@ -11,7 +11,7 @@ p1 = pk.planet.jpl_lp('earth')
 p2 = pk.planet.mpcorb('99942   19.2   0.15 K107N 202.49545  126.41859  204.43202    3.33173  0.1911104  1.11267324   0.9223398  1 MPO164109  1397   2 2004-2008 0.40 M-v 3Eh MPCAPO     C802  (99942) Apophis            20080109')
 k2 = 0.6
 n = 0
-isp_chem = 450
+isp_chem = 350
 isp_lt = 3000
 
 t0_range = [0, 5000]
@@ -29,8 +29,8 @@ def J(t0, tof):
             exps = prob.get_exposins()[i]
             dv1 = Vector.mag(Vector.sub(prob.get_v1()[i], v1))
             dv2 = Vector.mag(Vector.sub(prob.get_v2()[i], v2))
-            massratio = exps.get_final_mass(pk.MU_SUN, isp_lt, 1.0)
-            resJ.append(1.0 - math.exp(-(dv1 + dv2) / 9.81 / isp_chem) * massratio)
+            dvlt = exps.get_delta_v(pk.MU_SUN)
+            resJ.append(1.0 - math.exp(-(dv1 + dv2) / 9.81 / isp_chem - dvlt / 9.81 / isp_lt))
     if len(resJ) == 0:
         return numpy.nan
     else:
