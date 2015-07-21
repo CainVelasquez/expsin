@@ -12,16 +12,17 @@ p2 = pk.planet.mpcorb('99942   19.2   0.15 K107N 202.49545  126.41859  204.43202
 k2 = 0.6
 n = 0
 isp_chem = 350
-isp_lt = 3000
+isp_lt = 4000
 
 t0_range = [0, 5000]
 tof_range = [100, 900]
 
 @numpy.vectorize
 def J(t0, tof):
-    ep = pk.epoch(t0 + tof)
-    r1, v1 = p1.eph(ep)
-    r2, v2 = p2.eph(ep)
+    ep1 = pk.epoch(t0)
+    ep2 = pk.epoch(t0 + tof)
+    r1, v1 = p1.eph(ep1)
+    r2, v2 = p2.eph(ep2)
     resJ = []
     for lw in [False, True]:
         prob = pk.lambert_exposin(r1, r2, tof * pk.DAY2SEC, pk.MU_SUN, lw, n, k2)
